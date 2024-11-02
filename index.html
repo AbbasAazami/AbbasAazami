@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود / ثبت نام</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .form-container {
+            width: 400px;
+            padding: 20px;
+            border-radius: 15px;
+            background-color: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+        .form-control {
+            border-radius: 10px;
+        }
+        .btn {
+            border-radius: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        .captcha {
+            font-size: 1.5em;
+            margin: 10px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="form-container">
+    <form id="register-form">
+        <h2 class="text-center">ثبت نام</h2>
+        <div class="form-group">
+            <input type="text" id="register-username" class="form-control" placeholder="نام کاربری" required>
+        </div>
+        <div class="form-group">
+            <input type="text" id="register-phone" class="form-control" placeholder="شماره تلفن" required>
+        </div>
+        <div class="form-group">
+            <input type="password" id="register-password" class="form-control" placeholder="رمز عبور" required>
+        </div>
+        <div class="captcha" id="captcha-code"></div>
+        <div class="form-group">
+            <input type="text" id="captcha-input" class="form-control" placeholder="کد امنیتی را وارد کنید" required>
+        </div>
+        <div class="form-group hidden" id="verification-section">
+            <input type="text" id="verification-code" class="form-control" placeholder="کد تأیید را وارد کنید" required>
+            <button type="button" id="verify-button" class="btn btn-success btn-block">تأیید کد</button>
+        </div>
+        <button type="button" id="register-button" class="btn btn-primary btn-block">ثبت نام</button>
+        <p class="text-center">قبلاً ثبت نام کرده‌اید؟ <a href="#" id="show-login">ورود</a></p>
+    </form>
+
+    <form id="login-form" class="hidden">
+        <h2 class="text-center">ورود</h2>
+        <div class="form-group">
+            <input type="text" id="login-username" class="form-control" placeholder="نام کاربری" required>
+        </div>
+        <div class="form-group">
+            <input type="password" id="login-password" class="form-control" placeholder="رمز عبور" required>
+        </div>
+        <button type="button" id="login-button" class="btn btn-success btn-block">ورود</button>
+        <p class="text-center">هنوز ثبت نام نکرده‌اید؟ <a href="#" id="show-register">ثبت نام</a></p>
+    </form>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+let verificationCode; // کد تأیید
+let generatedCaptcha; // کد امنیتی
+
+// تولید کد امنیتی تصادفی
+function generateCaptcha() {
+    generatedCaptcha = Math.floor(1000 + Math.random() * 9000); // تولید عدد 4 رقمی
+    document.getElementById('captcha-code').innerText = generatedCaptcha;
+}
+
+// تغییر بین فرم‌ها
+document.getElementById('show-login').addEventListener('click', function() {
+    document.getElementById('register-form').classList.add('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+});
+
+document.getElementById('show-register').addEventListener('click', function() {
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('register-form').classList.remove('hidden');
+});
+
+// تابع برای ارسال اطلاعات به سرور
+function sendRequest(url, data) {
+    return fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    });
+}
+
+// تابع برای ارسال پیامک از طریق ملی پیامک
+function sendSMS(phoneNumber, message) {
+    const apiUrl = 'https://api.melipayamak.com/api/send/simple/'; // آدرس API ملی پیامک
+    const smsUsername = '09145447055'; // نام کاربری ملی پیامک
+    const smsPassword = '9eg27d3'; // رمز عبور ملی پیامک
+
+    return fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            username: smsUsername,
+            password: smsPassword,
+            to: phoneNumber,
+            text: message,
+            from: '226307' // شماره فرستنده (می‌توانید تغییر دهید)
+        })
+    }).then(response => response.json());
+}
+
+// ثبت نام
+document.getElementById('register-button').addEventListener('click', function() {
+    const username = document.getElementById('register-username').value.trim();
+    const phone = document.getElementById('register-phone').value.trim();
+    const password = document.getElementById('register-password').value.trim();
+    const captchaInput = document.getElementById('captcha-input').value.trim();
+
+    if (!username || !phone || !password || !captchaInput) {
+        alert('لطفاً همه فیلدها را پر کنید.');
+        return;
+    }
+
+    if (captchaInput !== generatedCaptcha.toString()) {
+        alert('کد امنیتی نادرست است. لطفاً دوباره تلاش کنید.');
+        generateCaptcha(); // تولید کد جدید
+        return;
+    }
+
+    sendRequest('register.php', { username, phone, password })
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                verificationCode = data.verificationCode; // کد تأیید را از سرور دریافت کنید
+                
+                // ارسال پیامک به کاربر
+                const smsMessage = `کد تأیید شما: ${verificationCode}`;
+                sendSMS(phone, smsMessage)
+                    .then(smsResponse => {
+                        console.log('SMS sent:', smsResponse);
+                        if (smsResponse.status === 'OK') {
+                            alert('پیامک با موفقیت ارسال شد.');
+                        } else {
+                            alert('خطا در ارسال پیامک: ' + smsResponse.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error sending SMS:', error);
+                        alert('خطا در ارسال پیامک. لطفاً دوباره تلاش کنید.');
+                    });
+
+                document.getElementById('verification-section').classList.remove('hidden'); // نمایش بخش تأیید
+                document.getElementById('register-button').classList.add('hidden'); // پنهان کردن دکمه ثبت‌نام
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('خطا در ارسال اطلاعات. لطفاً دوباره تلاش کنید.');
+        });
+});
+
+// تأیید کد
+document.getElementById('verify-button').addEventListener('click', function() {
+    const enteredCode = document.getElementById('verification-code').value.trim();
+
+    if (enteredCode !== verificationCode) {
+        alert('کد تأیید نادرست است. لطفاً دوباره تلاش کنید.');
+        return;
+    }
+
+    alert('ثبت‌نام با موفقیت انجام شد.');
+    document.getElementById('register-form').reset();
+    document.getElementById('verification-section').classList.add('hidden'); // پنهان کردن بخش تأیید
+    document.getElementById('register-button').classList.remove('hidden'); // نمایش دکمه ثبت‌نام
+});
+
+// ورود
+document.getElementById('login-button').addEventListener('click', function() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+
+    if (!username || !password) {
+        alert('لطفاً همه فیلدها را پر کنید.');
+        return;
+    }
+
+    sendRequest('login.php', { username, password })
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                window.location.href = 'dashboard.php'; // به عنوان مثال
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('خطا در ارسال اطلاعات. لطفاً دوباره تلاش کنید.');
+        });
+});
+
+// تولید کد امنیتی در بارگذاری صفحه
+generateCaptcha();
+</script>
+</body>
+</html>
